@@ -1,0 +1,65 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
+{\fonttbl\f0\fnil\fcharset0 BitstreamVeraSans-Roman;}
+{\colortbl;\red255\green255\blue255;\red128\green0\blue0;\red0\green0\blue179;\red179\green0\blue179;
+\red102\green0\blue102;}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+
+\f0\fs24 \cf0 (\
+e = (\
+	\cf2 \\play\cf0 :\{   \
+		\{\cf3 SinOsc\cf0 .ar(\cf4 400\cf0 )\}.play   \
+	\}\
+);\
+\
+l = \cf3 LiveEventController\cf0 ();\
+\
+l.add(\cf3 LiveEvent\cf0 (e.copy()));\
+l.add(\cf3 LiveEvent\cf0 (e.copy()));\
+l.add(\cf3 LiveEvent\cf0 (e.copy()));\
+l.add(\cf3 LiveEvent\cf0 (e.copy()));\
+\
+p = \cf3 LiveEventController\cf0 ();\
+\
+p.add(\cf3 LiveEvent\cf0 (e.copy()));\
+p.add(\cf3 LiveEvent\cf0 (e.copy()));\
+p.add(\cf3 LiveEvent\cf0 (e.copy()));\
+p.add(\cf3 LiveEvent\cf0 (e.copy()));\
+\
+w = \cf3 SCWindow\cf0 (\cf5 "test"\cf0 , \cf3 Rect\cf0 (\cf4 0\cf0 ,\cf4 0\cf0 ,\cf4 420\cf0 ,\cf4 500\cf0 )).front;\
+\
+n = \cf3 LiveNodeList\cf0 ( w, \cf3 Rect\cf0 (\cf4 5\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
+o = \cf3 LiveNodeList\cf0 ( w, \cf3 Rect\cf0 (\cf4 250\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
+m = \cf3 SelectionManager\cf0 ();\
+d = \cf3 TopLevelDragHandler\cf0 (w.view, m);\
+\
+n.selectionManager = m;\
+n.dragHandler = d;\
+o.selectionManager = m;\
+o.dragHandler = d;\
+\
+n.data = l;\
+n.updateArrangement;\
+\
+o.data = p;\
+o.updateArrangement;\
+)\
+\
+n.data[\cf4 0\cf0 ].changed(\cf2 \\childRemoved\cf0 )\
+\
+l.moveTo( 0, l[2] )\
+\
+o = \cf3 LiveNodeList\cf0 ( w, \cf3 Rect\cf0 (\cf4 250\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
+\
+n.selectionManager = m;\
+o.selectionManager = m;\
+\
+n.dragHandler = ();\
+o.dragHandler = d;\
+\
+n.createNode();\
+n.createNode();\
+n.createNode();\
+o.createNode();\
+o.createNode();\
+\
+\cf3 LiveEvent}
