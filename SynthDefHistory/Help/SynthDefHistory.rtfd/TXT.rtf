@@ -1,0 +1,155 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf320
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Monaco;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;\red0\green0\blue179;\red128\green0\blue0;
+\red179\green0\blue179;\red0\green0\blue179;\red128\green0\blue0;\red179\green0\blue179;}
+\deftab560
+\pard\pardeftab560\ql\qnatural
+
+\f0\b\fs36 \cf0 SynthDefHistory			
+\fs24 	A history of SynthDef changes
+\b0 \
+\
+SynthDefHistory tracks changes to SynthDef's by name. It stores these as a persistant database on disk, so previous versions of a SynthDef can be recalled easily.\
+\
+\pard\pardeftab560\ql\qnatural
+
+\b\fs28 \cf0 Class Methods
+\b0 \
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+
+\f1\fs18 \cf0 \
+
+\f0\b\fs24 	*load (names)
+\b0 \
+
+\b 	
+\b0 \
+\pard\pardeftab560\li1700\fi-1700\ql\qnatural
+\cf0 		
+\b names 
+\b0 - Single string/symbol, or a list of strings/symbols, to load from the disk.\
+		\
+		This method loads the history of the the SynthDef's in 
+\b names
+\b0  from the disk. If the archive gets large, this\
+		allows you to load the histories for certain defs on demand, rather than having to load all.\
+		If 
+\b names
+\b0  == "*", all SynthDef histories will be loaded.\
+		\
+	
+\b *gui ()\
+	\
+		
+\b0 Creates a UI for the SynthDefHistory.\
+		\
+\pard\pardeftab560\ql\qnatural
+
+\b\fs28 \cf0 Extension Methods\
+\
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+
+\fs24 \cf0 	SynthDef.newTrack (...)\
+		
+\b0 \
+		Equivalent to SynthDef.new() or SynthDef(), but adds the defined synth to the database.\
+		It is saved to disk immediately.\
+\
+
+\f1\fs18 \
+\pard\pardeftab560\ql\qnatural
+\cf0 			\
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+\cf0 \
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+
+\f0\b\fs28 \cf0 User Interface\
+\
+	
+\b0\fs24 The UI can be created using:\
+	\
+\pard\pardeftab560\ql\qnatural
+
+\f1\fs18 \cf2 		\cf3 SynthDefHistory\cf2 .gui;\
+\cf0 		\
+	\
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+
+\f0\fs24 \cf0 	If you have not loaded any SynthDef histories, it will be blank. New Defs that are added via .newTrack will automatically \
+	be populated in the window:\
+	\
+\pard\pardeftab560\ql\qnatural
+
+\f1\fs18 \cf2 		\cf3 SynthDef\cf2 .newTrack(\cf4 \\tone\cf2 , \{\
+			\cf3 var\cf2  sig;\
+			sig = \cf3 SinOsc\cf2 .ar(\cf5 440\cf2 );\
+			\cf3 Out\cf2 .ar(\cf5 0\cf2 , sig);\
+		\}).add;\
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+
+\f0\fs24 \cf0 	\
+\pard\pardeftab560\ql\qnatural
+
+\f1\fs18 \cf0 		\cf6 SynthDef\cf0 .newTrack(\cf7 \\tone\cf0 , \{\
+			| freq=440 |\
+			\cf6 var\cf0  sig;\
+			sig = \cf6 SinOsc\cf0 .ar(\cf8 freq\cf0 );\
+			\cf6 Out\cf0 .ar(\cf8 0\cf0 , sig);\
+		\}).add;\
+\pard\pardeftab560\li1140\fi-1140\ql\qnatural
+
+\f0\fs24 \cf0 	\
+	Redefining a version of the SynthDef that is already in the database will not create a new entry, though it will update\
+	the date of the existing entry.\
+	\
+	Now, there are now two entries in the history window, for each different version of the SynthDef.\
+	Clicking on entries in the list will show more detailed information in the footer. The description and comments fields\
+	are user-editable. The description field is, by default, populated by the date. The date shown is always the last time\
+	that particular version of the SynthDef was used. \
+	\
+	{{\NeXTGraphic Pasted Graphic 1.tiff \width10340 \height7080
+}¬}\
+	\
+	
+\b Buttons\
+	\
+	
+\b0 {{\NeXTGraphic star.png \width320 \height320
+}¬}
+\b 	
+\b0 Mark a SynthDef version as a favorite, or otherwise notable.\
+	\
+	{{\NeXTGraphic paste_plain.png \width320 \height320
+}¬}	Paste the SynthDef's code into the current document or selection. This will paste only the code contained \{ inside the brackets \}\
+		of a SynthDef's function. This allows you to double-click on the opening bracket of a SynthDef in code and quickly swap out the contents\
+		of the function from the database. 
+\b Shift clicking
+\b0  will paste a fully completed SynthDef, of the form: \
+		
+\f1\fs18 		\cf6 SynthDef\cf0 .newTrack(\cf7 \\tone\cf0 , \{\
+\pard\pardeftab560\ql\qnatural
+\cf0 					| freq=440 |\
+					\cf6 var\cf0  sig;\
+					sig = \cf6 SinOsc\cf0 .ar(\cf8 freq\cf0 );\
+					\cf6 Out\cf0 .ar(\cf8 0\cf0 , sig);\
+				\}).add;\
+		
+\f0\fs24 to your current document.\
+		\
+	{{\NeXTGraphic lightning_add.png \width320 \height320
+}¬}	Send the SynthDef to the server. Equivalent to doing  
+\f1\fs18 \cf6 SynthDef\cf0 .newTrack(\cf7 \\tone\cf0 , \{\}).add;\
+	\
+	
+\f0\fs24 {{\NeXTGraphic delete.png \width320 \height320
+}¬}
+\f1\fs18 	
+\f0\fs24 Delete the item from the SynthDef's history.\
+	\
+	\
+	{{\NeXTGraphic printer.png \width320 \height320
+}¬}	Dump all history items to a new document.\
+	\
+	{{\NeXTGraphic bin.png \width320 \height320
+}¬}	Delete 
+\b all non-starred def's from the history.}
