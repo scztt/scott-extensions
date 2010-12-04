@@ -1,6 +1,34 @@
+LinkedObjectListNode {
+	var <>prev, <>next;
+
+	*new { ^super.new() }
+
+	obj { ^this }
+
+	obj_{ 
+		"Cannot set obj for LinkedObjectListNode's.".warn;
+		this.dumpBackTrace;
+	}
+
+	remove {
+		if (prev.notNil, { prev.next_(next); });
+		if (next.notNil, { next.prev_(prev); });
+		next = prev = nil;
+	}	
+}
+
 LinkedObjectList : LinkedList {
+	var <>prev, <>next;
+	
 	tail { ^tail }
 	head { ^head }
+	
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	// LinkedObjectListNode
+	obj { ^this }
+	obj_{ "Cannot set obj for LinkedObjectListNode's.".warn }
+	//
+	////////////////////////////////////////////////////////////////////////////////////////////////
 	
 	addFirst {
 		| obj |
@@ -10,6 +38,7 @@ LinkedObjectList : LinkedList {
 			head.prev_(node);
 		});
 		head = node;
+		
 		if (tail.isNil, {
 			tail = node;
 		});
@@ -20,6 +49,7 @@ LinkedObjectList : LinkedList {
 		var node = obj;
 		if (tail.notNil, {
 			node.prev_(tail);
+			node.next_(tail.next);
 			tail.next_(node);
 		});
 		tail = node;
@@ -96,4 +126,20 @@ LinkedObjectList : LinkedList {
 	findNodeOfObj {
 		| obj | ^obj
 	}
+	
+	remove {
+		| node |
+		if( node.notNil, {
+			if (head == node, { head = node.next; });
+			if (tail == node, { tail = node.prev; });
+			
+			if (node.prev.notNil, { node.prev.next_(node.next); });
+			if (node.next.notNil, { node.next.prev_(node.prev); });
+			
+			node.next = node.prev = nil;
+			size = size - 1;
+			^node;
+		})
+	}	
+
 }

@@ -1,36 +1,92 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
 {\fonttbl\f0\fnil\fcharset0 BitstreamVeraSans-Roman;}
-{\colortbl;\red255\green255\blue255;\red128\green0\blue0;\red0\green0\blue179;\red179\green0\blue179;
-\red102\green0\blue102;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue179;\red128\green0\blue0;\red179\green0\blue179;
+\red0\green102\blue0;\red0\green0\blue0;\red102\green0\blue102;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
 
 \f0\fs24 \cf0 (\
+s.boot;\
+c = \cf2 Condition\cf0 (\cf2 false\cf0 );\
+\
+\cf2 SynthDef\cf0 (\cf3 \\click\cf0 , \{\
+	\cf2 Line\cf0 .kr(\cf4 0\cf0 ,\cf4 0\cf0 ,\cf4 0.0001\cf0 ,doneAction:\cf4 2\cf0 );\
+	\cf2 Out\cf0 .ar(\cf4 0\cf0 , \cf2 Impulse\cf0 .ar(\cf4 0\cf0 ) )\
+\}).add;\
+\
 e = (\
-	\cf2 \\play\cf0 :\{   \
-		\{\cf3 SinOsc\cf0 .ar(\cf4 400\cf0 )\}.play   \
+	\cf3 \\duration\cf0 : \cf4 0.5\cf0 ,\
+	\cf3 \\play\cf0 : \{  \
+		\cf2 Synth\cf0 (\cf3 \\click\cf0 );\
 	\}\
 );\
 \
-l = \cf3 LiveEventController\cf0 ();\
+f = (\
+	\cf3 \\color\cf0 : \cf2 Color\cf0 .green(\cf4 0.6\cf0 ),\
+	\cf3 \\play\cf0 : \{  \
+		\cf2 var\cf0  n, time, freq;\
+		time=\cf4 4\cf0 .rand+\cf4 1\cf0 ;\
+		freq = (\cf4 30 \cf0 + (\cf4 8\cf0 .rand*\cf4 3\cf0 )).midicps + [\cf4 0\cf0 ,\cf4 4\cf0 ,\cf4 7\cf0 ];\
+		n = \{ \
+			[\cf4 1\cf0 ,\cf4 1\cf0 ] * \cf2 LPF\cf0 .ar(\
+				(\cf2 LFSaw\cf0 .ar(freq)).sum * \
+				\cf2 EnvGen\cf0 .ar( \cf2 Env\cf0 ([\cf4 1\cf0 ,\cf4 0\cf0 ], [\cf4 0.99\cf0 ]), timeScale:time, doneAction:\cf4 2\cf0 )\
+				, \cf2 Line\cf0 .kr( \cf4 2000\cf0 , \cf4 20\cf0 , time )\
+			)\
+		\}.play;\
+		(time/\cf4 2\cf0 ).wait;\
+	\}\
+);\
 \
-l.add(\cf3 LiveEvent\cf0 (e.copy()));\
-l.add(\cf3 LiveEvent\cf0 (e.copy()));\
-l.add(\cf3 LiveEvent\cf0 (e.copy()));\
-l.add(\cf3 LiveEvent\cf0 (e.copy()));\
+f.play = \{  \
+		\cf2 var\cf0  n, time, freq;\
+		time=\cf4 4\cf0 .rand+\cf4 1\cf0 ;\
+		freq = (\cf4 30 \cf0 + (\cf4 8\cf0 .rand*\cf4 3\cf0 )).midicps + [\cf4 0\cf0 ,\cf4 3\cf0 ];\
+		n = \{ \
+			[\cf4 1\cf0 ,\cf4 1\cf0 ] * \cf2 LPF\cf0 .ar(\
+				(\cf2 LFSaw\cf0 .ar(freq)).sum * \
+				\cf2 EnvGen\cf0 .ar( \cf2 Env\cf0 ([\cf4 1\cf0 ,\cf4 0\cf0 ], [\cf4 0.99\cf0 ]), timeScale:time, doneAction:\cf4 2\cf0 )\
+				, \cf2 Line\cf0 .kr( \cf4 2000\cf0 , \cf4 20\cf0 , time )\
+			)\
+		\}.play;\
+		(time/\cf4 2\cf0 ).wait;\
+	\};\
 \
-p = \cf3 LiveEventController\cf0 ();\
 \
-p.add(\cf3 LiveEvent\cf0 (e.copy()));\
-p.add(\cf3 LiveEvent\cf0 (e.copy()));\
-p.add(\cf3 LiveEvent\cf0 (e.copy()));\
-p.add(\cf3 LiveEvent\cf0 (e.copy()));\
+l = \cf2 LiveEventController\cf0 ();\
 \
-w = \cf3 SCWindow\cf0 (\cf5 "test"\cf0 , \cf3 Rect\cf0 (\cf4 0\cf0 ,\cf4 0\cf0 ,\cf4 420\cf0 ,\cf4 500\cf0 )).front;\
+l.add(\cf2 LiveEvent\cf0 (e));\
+l.add(\cf2 LiveEvent\cf0 (e));\
+l.add(\cf2 LiveEvent\cf0 (e));\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+\cf5 //g = LiveEventSequence();\cf6 \
+\cf5 //g.add( LiveEvent(f) );\cf6 \
+\cf5 //g.add( LiveEvent(f) );\cf6 \
+\cf5 //g.add( LiveEvent(f) );\cf6 \
+\cf5 //\cf6 \
+\cf5 //l.add( g );\cf6 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+\cf0 l.add(\cf2 LiveEvent\cf0 (e));\
+l.add(\cf2 LiveEvent\cf0 (e));\
+l.add(\cf2 LiveEvent\cf0 (e));\
+l.add(\cf2 LiveEvent\cf0 (e));\
+l.add(\cf2 LiveEvent\cf0 (e));\
 \
-n = \cf3 LiveNodeList\cf0 ( w, \cf3 Rect\cf0 (\cf4 5\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
-o = \cf3 LiveNodeList\cf0 ( w, \cf3 Rect\cf0 (\cf4 250\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
-m = \cf3 SelectionManager\cf0 ();\
-d = \cf3 TopLevelDragHandler\cf0 (w.view, m);\
+p = \cf2 LiveEventController\cf0 ();\
+\
+p.add(\cf2 LiveEvent\cf0 (f));\
+p.add(\cf2 LiveEvent\cf0 (f));\
+p.add(\cf2 LiveEvent\cf0 (f));\
+p.add(\cf2 LiveEvent\cf0 (f));\
+p.add(\cf2 LiveEvent\cf0 (f));\
+p.add(\cf2 LiveEvent\cf0 (f));\
+\
+w = \cf2 SCWindow\cf0 (\cf7 "test"\cf0 , \cf2 Rect\cf0 (\cf4 0\cf0 ,\cf4 0\cf0 ,\cf4 460\cf0 ,\cf4 510\cf0 )).front;\
+\
+n = \cf2 LiveNodeListView\cf0 ( w, \cf2 Rect\cf0 (\cf4 5\cf0 ,\cf4 5\cf0 ,\cf4 250\cf0 -\cf4 10\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
+o = \cf2 LiveNodeListView\cf0 ( w, \cf2 Rect\cf0 (\cf4 250\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
+m = \cf2 SelectionManager\cf0 ();\
+\
+d = \cf2 TopLevelDragHandler\cf0 (w.view, m);\
 \
 n.selectionManager = m;\
 n.dragHandler = d;\
@@ -42,24 +98,11 @@ n.updateArrangement;\
 \
 o.data = p;\
 o.updateArrangement;\
+fork \{ l.do( \cf2 _\cf0 .doInitialize) \};\
+fork \{ p.do( \cf2 _\cf0 .doInitialize) \};\
+\
 )\
 \
-n.data[\cf4 0\cf0 ].changed(\cf2 \\childRemoved\cf0 )\
 \
-l.moveTo( 0, l[2] )\
-\
-o = \cf3 LiveNodeList\cf0 ( w, \cf3 Rect\cf0 (\cf4 250\cf0 ,\cf4 5\cf0 ,\cf4 200\cf0 ,\cf4 500\cf0 -\cf4 5\cf0 ) );\
-\
-n.selectionManager = m;\
-o.selectionManager = m;\
-\
-n.dragHandler = ();\
-o.dragHandler = d;\
-\
-n.createNode();\
-n.createNode();\
-n.createNode();\
-o.createNode();\
-o.createNode();\
-\
-\cf3 LiveEvent}
+\cf2 Routine\cf0 (\{ l.doLoop(\cf2 nil\cf0 , \cf4 100\cf0 ) \}).play(\cf2 SystemClock\cf0 )\
+}

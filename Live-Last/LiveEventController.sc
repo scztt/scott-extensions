@@ -1,10 +1,6 @@
-
 LiveEventController : LinkedObjectList {
-	var <list;
-	
 	*new {
-		| list |
-		^super.newCopyArgs(list);
+		^super.new;
 	}
 	
 	add {

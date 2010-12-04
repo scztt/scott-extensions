@@ -1,5 +1,5 @@
 TopLevelDragHandler {
-	var view, selectionManager, dragTargets, dragging, draggingOver;
+	var view, <dragLayer, selectionManager, dragTargets, dragging, draggingOver;
 	
 	*new {
 		| view, selectionManager |
@@ -8,9 +8,33 @@ TopLevelDragHandler {
 	
 	init {
 		| inView, inSelectionManager |
-		selectionManager = inSelectionManager;
+		dragLayer = SCCompositeView( inView, inView.bounds.moveTo(0,0))
+			.resize_(5);
 		view = inView;
+		selectionManager = inSelectionManager;
 		dragTargets = LinkedList.new;
+	}
+	
+	getDragParentsMap{
+		var contained;
+		var result = IdentityDictionary.new;
+		var draggingCopy = LinkedList.newFrom(dragging);
+		
+		dragTargets.do({
+			| target |
+			if( draggingCopy.isEmpty.not, {
+				contained = draggingCopy.removeAllSuchThat({
+					| node |
+					target.containsNode(node);
+				});
+				contained.do({
+					| node |
+					result[node] = target;
+				});
+			})
+		});
+		
+		^result;
 	}
 	
 	addTarget {
@@ -67,12 +91,19 @@ TopLevelDragHandler {
 					draggedItems = dragging.collect( _.data );
 					dragging.reverse.do({
 						| node |
-						draggingOver.nodes[node.data].isNil.if({
-							node.data.changed(\childRemoved);
-							draggingOver.data.insert( dropPosition, node.data );
+						if( node.data.state != \playing, {
+							draggingOver.nodes[node.data].isNil.if({
+								node.data.changed(\childRemoved);
+								draggingOver.data.insert( dropPosition, node.data );
+								draggingOver.data.validate;
+							},{
+								draggingOver.data.moveTo( dropPosition, node.data );
+								draggingOver.data.validate;
+							})		
 						},{
-							draggingOver.data.moveTo( dropPosition, node.data );
-						})		
+							dragging.remove(node);
+							draggedItems.remove(node.data);
+						})
 					});
 					draggingOver.data.changed(\itemsAdded, draggedItems, dragging )
 				});			

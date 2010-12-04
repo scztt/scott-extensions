@@ -1,9 +1,10 @@
-LiveNodeList : SCCompositeView {
-	var topMargin = 5, leftMargin = 2, verticalSpacing = 2;
-	var <data, <nodes, dragLayer, dragHighlight, dragHighlightPosition, contentLayer, 
+LiveNodeListView : SCCompositeView {
+	var topMargin = 3, leftMargin = 3, verticalSpacing = 1;
+	var <data, <nodes, dragLayer, decoratorLayer, contentLayer, dragHighlight, dragHighlightPosition,  
 		<dragHandler, dragEvent, draggedItems,
 		<blockUpdates=false, needsUpdate=false,
-		<>selectionManager;
+		<>selectionManager,
+		backgroundColor, lineColor, highlightColor;
 	
 	*viewClass { ^SCCompositeView }
 	
@@ -14,8 +15,27 @@ LiveNodeList : SCCompositeView {
 	
 	initLiveNodeList {
 		nodes = IdentityDictionary.new;
+		decoratorLayer = SCUserView( this, this.bounds.moveTo(0,0))
+			.drawFunc_({ this.decoratorDraw() });
 		contentLayer = SCCompositeView( this, this.bounds.moveTo(0,0));
-		dragLayer = SCCompositeView( this, this.bounds.moveTo(0,0));	}
+		dragLayer = SCCompositeView( this, this.bounds.moveTo(0,0));
+		
+		backgroundColor = Color.grey(0.7);
+		lineColor = Color.grey(0.3);
+		highlightColor = Color.yellow.alpha_(0.9);
+		
+		this.focusColor = Color.clear;
+		
+		this.onClose = {
+			nodes.do({
+				| nodes |
+				nodes.data = nil;
+			});
+			data.removeDependant();
+			nodes = dragHandler = dragEvent = draggedItems = selectionManager = nil;
+			this.releaseDependants();
+		}
+	}
 	
 	dragHandler_{
 		| inHandler |
@@ -47,7 +67,7 @@ LiveNodeList : SCCompositeView {
 	rebuild {
 		var differenceSet, node;
 		var newNodes = IdentityDictionary.new;
-		data.do({
+		data.seq.do({
 			| item |
 			node = nodes[item];
 			node.notNil.if({
@@ -62,10 +82,16 @@ LiveNodeList : SCCompositeView {
 			// do removal stuff
 		});
 		nodes = newNodes;
+		this.updateArrangement();
 	}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//	Dragging
+	
+	containsNode {
+		| node |
+		^nodes.includesKey(node)
+	}
 	
 	dragToChanged {
 		| items, x, y |
@@ -84,15 +110,15 @@ LiveNodeList : SCCompositeView {
 		| y |
 		var nearestY, dropPosition, nearestYDelta;
 		var node;
-		if (data.size>0, {
-			node = nodes[data[0]];
-			nearestY = node.bounds.top;
+		if (data.seq.size>0, {
+			node = nodes[data.seq[0]];
+			nearestY = node.bounds.top-2;
 			nearestYDelta = (nearestY-y).abs;
 			dropPosition = 0;
-			data.do({
-				| data, i |
+			data.seq.do({
+				| item, i |
 				var bounds, delta;
-				bounds = nodes[data].bounds;
+				bounds = nodes[item].bounds;
 				delta = (y-(bounds.top+bounds.height)).abs;
 				if( delta < nearestYDelta, {
 					nearestYDelta = delta;
@@ -101,6 +127,8 @@ LiveNodeList : SCCompositeView {
 				});
 			});
 			^[nearestY, dropPosition];		
+		},{
+			^[topMargin, 0];
 		});
 		^[nil,nil];
 	}
@@ -108,18 +136,15 @@ LiveNodeList : SCCompositeView {
 	putDragHighlight {
 		| y |
 		if( y.notNil, {
-			dragHighlightPosition = y;
+			dragHighlightPosition = y+1;
 			dragHighlight = dragHighlight ?? { 
 				SCUserView( dragLayer, this.bounds.moveTo(0,0)) 
 					.drawFunc_({ 
 						| view |
-						var bounds = view.bounds;
-						Pen.strokeColor = Color.yellow.alpha_(0.6);
-						Pen.width = 2;
-						Pen.strokeRect(bounds.moveTo(0,0));
-						Pen.strokeColor = Color.yellow.alpha_(0.6);
-						Pen.width = 4;
-						Pen.line( 0@dragHighlightPosition, bounds.width@dragHighlightPosition );
+						var bounds = view.bounds.moveTo(0,0).insetBy(3,3);
+						Pen.strokeColor = highlightColor;
+						Pen.width = 3;
+						Pen.line( 3@dragHighlightPosition, bounds.right@dragHighlightPosition );
 						Pen.stroke;
 					})
 			};
@@ -133,6 +158,14 @@ LiveNodeList : SCCompositeView {
 		dragHighlight.notNil.if({ dragHighlight.remove() });
 		dragHighlight = nil;
 		this.refresh();
+	}
+	
+	decoratorDraw {
+		Pen.width = 4;
+		Pen.color = backgroundColor;
+		Pen.fillRect( decoratorLayer.bounds );
+		Pen.color = lineColor;
+		Pen.strokeRect( decoratorLayer.bounds );
 	}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,7 +183,10 @@ LiveNodeList : SCCompositeView {
 		| newNode |
 		newNode.dragLayer = dragLayer;
 		newNode.dragHandler = dragHandler;
-		newNode.createView( contentLayer, Rect(0,0,this.bounds.width-leftMargin-leftMargin,20));
+		newNode.createView( contentLayer, Rect(0,0,this.bounds.width-leftMargin-leftMargin,24));
+//		newNode.startDragAction = dragHander.startDragAction ;
+//		newNode.finishDragAction = this.nodeMouseMoveAction(_);
+//		newNode.dragAction = this.nodeMouseUpAction(_);
 		newNode.addDependant( this );
 	}
 	
@@ -195,8 +231,6 @@ LiveNodeList : SCCompositeView {
 		{ \itemsAdded }
 			{
 				var node, nodes, items;
-				"items added.".postln;
-				args.postln;
 				items = args[0];
 				nodes = args[1];
 				if(nodes.isNil, {
@@ -216,8 +250,6 @@ LiveNodeList : SCCompositeView {
 			}
 		{ \itemsRemoved }
 			{
-				"items removed.".postln;
-				args.postln;
 				args[0].do({
 					| item |
 					this.removeNode( item );
@@ -227,6 +259,10 @@ LiveNodeList : SCCompositeView {
 		{ \listChanged }
 			{
 				this.rebuild();
+				this.updateArrangement();
+			}
+		{ \boundsChanged }
+			{
 				this.updateArrangement();
 			}
 		;
@@ -253,19 +289,18 @@ LiveNodeList : SCCompositeView {
 		if(blockUpdates, {
 			needsUpdate = true;
 		},{
-			data.do({
+			data.seq.do({
 				| item, i |
 				node = nodes[item];
 				if( node.notNil, {
 					node.moveTo(leftMargin@y);
 					y = y + node.height + verticalSpacing;
-					y.postln; 
 				},{
 					"Nil node encountered....".warn;
 				})
 			});
 			
-			y = y + verticalSpacing;
+			y = y + verticalSpacing + 1;
 			this.bounds = this.bounds.height_(y);
 			this.refresh();
 			this.changed(this, \bounds);
@@ -280,10 +315,6 @@ LiveNodeList : SCCompositeView {
 		this.setProperty(\bounds, rect);
 		dragLayer.bounds = rect.moveTo(0,0);
 		contentLayer.bounds = rect.moveTo(0,0);
-	}
-	
-	onClose {
-		nodes = dragHandler = dragEvent = draggedItems = selectionManager = nil;
-		this.releaseDependants();
-	}
+		decoratorLayer.bounds = rect.moveTo(0,0);
+	}	
 }
