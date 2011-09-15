@@ -1,5 +1,5 @@
 BehaviorPlayer {
-	var <server, <type, <params, <size, <group, <synthStack, 
+	var <server, <type, <params, <size, <group, <nodeMap, <synthStack, 
 		behaviorsLib, <behaviorStack, <bus, <running=false,
 		autoSend=true, clock, publishControls=true, <nodeWatcher, 
 		removed, <>defaultValues, <baseSynth;
@@ -13,6 +13,20 @@ BehaviorPlayer {
 	// type == aSynthDef.name
 	*newFromSynthDef {
 		| server, synthDef |
+		var synthDesc;
+		
+		if( synthDef.isKindOf(Symbol) || synthDef.isKindOf(String), {
+			synthDesc = SynthDescLib.global[synthDef] ?
+				SynthDescLib.global[synthDef.asSymbol] ?
+				SynthDescLib.global[synthDef.asString];
+				
+				if( synthDesc.notNil, {
+					^super.newCopyArgs( server, synthDesc.name, synthDesc.controlNames.asArray )
+						.defaultValues_( synthDesc.controls.collect(_.defaultValue).asArray )
+						.init;
+				});
+		});
+		
 		^super.newCopyArgs( server, synthDef.name, synthDef.allControlNames.collect( _.name ) )
 			.defaultValues_( synthDef.controls )
 			.init;
@@ -31,6 +45,9 @@ BehaviorPlayer {
 		synthStack = List.new;
 		clock = TempoClock.new;
 		removed = IdentityDictionary.new;
+		nodeMap = NodeMap();
+		
+		CmdPeriod.doOnce({ this.free });
 		
 		if( autoSend && server.serverRunning, { this.send });
 	}
@@ -94,18 +111,27 @@ BehaviorPlayer {
 			toRemove = List.new(16);
 			behaviorStack.reverseDo({
 				| stackItem, i |
-				if( i != 0, {
-					usedParamCount = stackItem.params.size;
-					stackItem.params.do({
-						| p |
-						usedParams.addFail( p, { usedParamCount = usedParamCount-1 })
-					});
-					if( usedParamCount<=0, { toRemove.add( behaviorStack.size-i-1 ) })
+				"\n\n".postln; stackItem.postln;
+				usedParamCount = stackItem.params.size;
+				"params: %\n".postf(usedParamCount);
+				stackItem.params.do({
+					| p |
+					usedParams.addFail( p, { usedParamCount = usedParamCount-1 });
+					"\t".post; usedParamCount.postln;
 				});
+
+				if( (i != 0) && (usedParamCount <= 0), { 
+					toRemove.add( behaviorStack.size-i-1 );
+					"Added % to removal list.\n".postf(behaviorStack.size-i-1);
+				});
+				"used: ".postln; usedParams.postln;
 			});
 			
 			// Set fadetimes for whole stack.
 			group.set( \fadeWrapped, fadetime );
+			
+			// Update node mappings
+			this.sendNodeMap();
 			
 			// Ungate and remove all toRemove synths
 			toRemove.do( this.remove(_, fadetime) );
@@ -162,7 +188,18 @@ BehaviorPlayer {
 	
 	set {
 		| ...args |
-		group.set( *args );
+		nodeMap.set( *args );
+		this.sendNodeMap();
+	}
+	
+	map {
+		| Éargs |
+		nodeMap.map( *args );
+		this.sendNodeMap();
+	}
+	
+	sendNodeMap {
+		nodeMap.send(server, group.nodeID);
 	}
 	
 	prPlay {

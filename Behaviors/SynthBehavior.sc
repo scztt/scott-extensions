@@ -8,11 +8,14 @@ SynthBehavior {
 			
 	*initClass {
 		Class.initClassTree( Archive );
+		Class.initClassTree(String);
+
+		archivePath = Platform.userAppSupportDir +/+ "SynthBehaviors.sctxar";
+
 		server = Server.default;
 		libraries = IdentityDictionary.new;
 		SynthBehavior.loadLibrary();
 		delayedSave = Collapse.new({ this.saveLibrary() }, 0.1 );
-		archivePath = Platform.userAppSupportDir +/+ "SynthBehaviors.sctxar";
 	}
 	
 	*library {
@@ -49,10 +52,7 @@ SynthBehavior {
 	}
 		
 	*loadLibrary {
-		{
-			archive = Object.readArchive( archivePath );
-		}.try({
-			archive = MultiLevelIdentityDictionary();			});
+		archive = Object.readArchive( archivePath );
 		
 		libraries = archive.at( \libraries ) ? libraries;
 	}
@@ -105,8 +105,8 @@ SynthBehavior {
 			| lib |
 			lib.keysValuesDo({
 				| key, def |
-				key.postln;
 				if( key != \_params, {
+					key.postln;
 					def.send();
 				});
 			})
@@ -129,7 +129,7 @@ SynthBehavior {
 		params = List.new(16);
 		server = this.class.server;
 		sentCondition = AsyncCondition( this );
-		ignoredControls = IdentitySet.new.addAll([ \i_outWrapped, \gateWrapped, \fadeWrapped ]);
+		ignoredControls = IdentitySet.new.addAll([ \i_outWrapped, \gateWrapped, \fadeWrapped, \i_fadeOutTo ]);
 
 		// Build SynthDef
 		def = SynthDef( defSymbol, {
@@ -138,8 +138,7 @@ SynthBehavior {
 			
 			// Wrap. If input isn't a function, turn it into one.
 			wrapped = SynthDef.wrap( 
-					if( function.isKindOf( Function ), {function}, { {function} }),
-					[\ir, \kr, \kr]
+					if( function.isKindOf( Function ), { function }, { {function} })
 			);
 			
 			// If it's a dictionary, remember the params it's using, and order them properly.
