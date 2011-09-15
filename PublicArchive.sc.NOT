@@ -1,0 +1,24 @@
+PublicArchive : Public {
+	dispatch { arg key, obj;
+		var sendObj, b;
+		sendObj = obj.envArchiveForOSC(envir); // must be symbol or object, not string!
+		if(logSelf) { action.value(this, sendObj, key, nickname) };
+		if(channel.isNil or: { nickname.isNil }) { Error("first join a channel, please").throw };
+		b = ['/public', nickname, channel, key] ++ sendObj;
+		//if(bundleSize([nil] ++ b) > 8125) { "message too large to publish".postln; ^this };
+		addresses.do { arg addr; addr.sendBundle(nil, b) };
+	}
+
+	receive { arg argObj, key ... args;
+			var obj;
+			if(this.avoidTheWorst(argObj)) {
+				obj = argObj.decodeArchiveFromOSC(envir);
+				action.valueArray(this, argObj, key, args);
+				if(obj.notNil) {
+					this.localPut(key, obj);
+					this.changed( \received, key, obj );
+				};
+			}
+	}
+}
+

@@ -1,0 +1,457 @@
+Debugger {
+	classvar <>breakpoints;
+	var <thread, currentObject;
+	var <>behavior;
+	
+	*initClass {
+		breakpoints = List.new;
+	}
+	
+	*debug {
+		| func |
+		var debugger, routine;
+		routine = Routine(func);
+		debugger = Debugger(routine);
+		^debugger.debug;
+	}
+	
+	*new {
+		| thread |
+		^super.newCopyArgs( thread ).init;
+	}
+	
+	
+	init {
+		behavior = DefaultDebuggerBehavior.new;
+		behavior.breakpoints = this.class.breakpoints;
+	}
+	
+	debugFunc {
+		| func |
+		thread = Routine(func);
+		this.debug();
+	}
+	
+	debug {
+		thread.setDebugging(true);
+		fork {
+			while({ thread.state != 6 }, {
+				currentObject = thread.next();
+				
+				if( behavior.breakCondition( thread, currentObject ), {
+					behavior.breakAction( thread, currentObject );
+				});
+			});
+		}
+	}
+}
+
+Breakpoint {
+	var <filenameSymbol, <charStart, <charEnd;
+	*new {
+		| fileSymbol, charStart, charEnd |
+		^super.newCopyArgs(fileSymbol, charStart, charEnd );
+	}
+	
+	*newFromDocumentSelection {
+		| document |
+		var symbol, char, lineStart, lineEnd;
+		symbol = document.path.asSymbol;
+		
+		lineStart = document.selectionStart;
+		char = document.string[lineStart];
+		
+		while( { (char != $\n) }, {
+			lineStart = lineStart - 1;
+			char = document.string[lineStart];
+		});
+		lineEnd = document.string.find( "\n", false, lineStart+1 );
+		^super.newCopyArgs( symbol, lineStart+1, lineEnd );
+	}
+	
+	asString {
+		^format( "%[%-%]", filenameSymbol, charStart, charEnd );
+	}
+}
+
+DebuggerBehavior {
+	var <>breakCondition, <>breakAction;
+}
+
+DefaultDebuggerBehavior {
+	var line, frame, method, block, object;
+	var <>breakpoints;
+	var lastLine, lastContext, lastObject;
+	var mode=\continue;
+	var stepOutFrame, stepFrame;
+	var windowBounds, stackView, contextView;
+	var lastBp, lastBpMethod;
+	
+	breakCondition {
+		| aThread, aObject |
+		line = aThread.line;
+		method = aThread.getSlots[7];		// method slot
+		block = aThread.getSlots[9]; 		// block slot
+		frame = aThread.getBackTrace();
+		object = aObject;
+		
+		switch ( mode, 
+			\continue, {
+				// "lastBp:%\n".postf(lastBp);
+				breakpoints.do({
+					| bp |
+					if( 	method.notNil, {
+						if( method.filenameSymbol == bp.filenameSymbol, {
+							if(	(aThread.character >= bp.charStart) && 
+								(aThread.character <= bp.charEnd ), 
+								// breakpoint match
+								{
+									if( (bp != lastBp), {
+										lastBp = bp;
+										lastBpMethod = method;
+										//"lastBp = %\n".postf( lastBp.asString );
+										^true 
+									})
+								}, 
+								// no match or already hit
+								{
+									// "bp:%\n".postf(bp.asString);
+									if( (bp == lastBp) && ( lastBpMethod == method ), 
+										{ lastBp=nil });
+								}
+							)
+						},{
+							// Compiling live code
+							if( method.postln == Interpreter.methods[67], {
+								{ aThread.inspect }.defer;
+								if( bp.filenameSymbol == TempFunctionTable.table[ aThread.getSlots[1] ], {
+									"woa, it worked.".postln;
+								})
+							})
+						})
+					})
+				});
+				^false
+			},
+			\stepOut, {
+				if( frame.notNil and: { frame.address == stepOutFrame.address }, {
+					mode=\step;
+					^true;
+				}, { 
+					^false 
+				});
+			},
+			\stepIn, {
+				if( frame.notNil and: { frame.address != stepFrame.address || (lastLine != line)  }, {
+					^true
+				},{
+					^false
+				});
+			},
+			\step, { 
+				if( frame.notNil && (lastLine != line) and: { 
+					( frame.context.address == stepFrame.context.address ) || 
+ 					( frame.address == stepOutFrame.address )
+				}, {
+					mode=\step;
+					^true;
+				}, { 
+					^false 
+				});						
+			},
+			\bytestep, {
+				if( frame.notNil and: { 
+					frame.context.address == stepFrame.context.address
+				}, {
+					mode=\bytestep;
+					^true;
+				}, { 
+					^false 
+				});	
+			},
+			\bytein, {
+				^true
+			}
+		);
+		^false
+	}
+	
+	breakAction {
+		| aThread, aObject |
+		var condition, wind, text;
+		condition = Condition.new(false);
+		{
+			wind = SCWindow( "continue", Rect(100,100,720,290));
+			wind.view.decorator = FlowLayout(wind.view.bounds);
+			
+			SCButton( wind, 30@30)
+				.states_([["in",Color.black, Color.grey]])
+				.action_({ this.stepIn(); condition.unhang; this.closeWindow( wind ); });
+			SCButton( wind, 30@30)
+				.states_([["out",Color.black, Color.grey]])
+				.action_({ this.stepOut(); condition.unhang; this.closeWindow( wind ); });
+			SCButton( wind, 40@30)
+				.states_([["step",Color.black, Color.grey]])
+				.action_({ this.step(); condition.unhang; this.closeWindow( wind ); });
+			SCButton( wind, 40@30)
+				.states_([["byteStep",Color.black, Color.grey]])
+				.action_({ this.bytestep(); condition.unhang; this.closeWindow( wind ); });
+			SCButton( wind, 40@30)
+				.states_([["byteIn",Color.black, Color.grey]])
+				.action_({ this.bytein(); condition.unhang; this.closeWindow( wind ); });
+			SCButton( wind, 30@30)
+				.states_([["->",Color.black, Color.grey]])
+				.action_({ this.continue(); condition.unhang; this.closeWindow( wind ); });
+			SCButton( wind, Rect(0,0,100,20))
+				.states_([["this.i",Color.black, Color.grey]])
+				.action_({ object.inspect });
+			wind.view.decorator.nextLine;
+			
+			stackView = StackView( wind, 350@300, frame )
+				.addDependant( this );
+			contextView = ContextVariableView( wind, 350@300, frame );
+			
+			wind.bounds = windowBounds ? wind.bounds;
+			wind.onClose_({
+				stackView.removeDependant( this );
+			});
+			wind.front;
+			
+			if( aThread.notNil and: { aThread.method.notNil }, {
+				aThread.method.openCodeFileAndSelect( aThread.character );
+			})
+		}.defer;
+		condition.wait;		
+	}
+	
+	closeWindow {
+		| wind |
+		windowBounds = wind.bounds;
+		wind.visible = false;
+		{ wind.close() }.defer(0.2);
+	}
+	
+	stepOut {
+		mode = \stepOut;
+		stepOutFrame = frame.caller;
+		lastLine = line;
+	}
+	
+	stepIn {
+		mode = \stepIn;
+		stepFrame = frame;
+		lastLine = line;
+	}
+	
+	step {
+		mode = \step;
+		stepFrame = frame;
+		stepOutFrame = frame.caller;
+		lastLine = line;
+	}
+
+	bytestep {
+		mode = \bytestep;
+		stepFrame = frame;
+		stepOutFrame = frame.caller;
+	}
+
+	bytein {
+		mode = \bytein;
+	}
+	
+	continue {
+		mode = \continue;
+	}	
+	
+	update {
+		| sender, message ...args |
+		switch ( message )
+			{ \frameSelected }
+				{
+					contextView.frame = args[0]	
+				}
+		;
+	}
+}
+
+StackView {
+	var parent, bounds, currentFrame,
+		container;
+	
+	*new {
+		| parent, bounds, currentFrame |
+		^super.newCopyArgs( parent, bounds, currentFrame ).init;
+	}
+	
+	init {
+		var frameStack, frame, xPos, yPos, width, height;
+		container = SCScrollView( parent, bounds );
+		container.background_(Color.grey.alpha_(0.1));
+
+		bounds = container.bounds;
+		xPos = 3;
+		yPos = 3;
+		width = bounds.width - (2*xPos) - 20;
+		height = 18;
+		
+		frameStack = LinkedList.new;
+		frame = currentFrame;
+		while( { frame.notNil }, {
+			frameStack.add( frame );
+			frame = frame.caller;
+		});
+		frameStack.do({
+			| frame |
+			RoundButton( container, Rect( xPos, yPos, width, height ))
+				.extrude_(false).radius_(2).resize_(2)
+				.states_([[ frame.getFriendlyString() ]])
+				.action_({
+					if( frame.notNil and: { frame.functionDef.notNil }, {
+						frame.functionDef.openCodeFileAndSelect(frame.line);
+						this.changed( \frameSelected, frame );
+					});
+				});
+				yPos = yPos + height + 3;
+		})
+	}	
+}
+
+ContextVariableView {
+	var parent, bounds, currentFrame,
+		container, items;
+	
+	*new {
+		| parent, bounds, currentFrame |
+		^super.newCopyArgs( parent, bounds ).init.frame_(currentFrame);
+	}
+	
+	init {
+		container = SCScrollView( parent, bounds );
+		container.background_(Color.grey.alpha_(0.1));
+		bounds = container.bounds;
+	}
+	
+	frame_{
+		| aFrame |
+		this.clearItems();
+		currentFrame = aFrame;
+		this.makeItems();		
+	}
+	
+	clearItems {
+		items.do({
+			| i |
+			i.visible = false;
+			i.remove();
+		});
+		container.refresh();
+		items = List.newClear;
+	}
+	
+	makeItems {
+		var x=3, y=3, width,
+			height=17;
+		var dict, str, button;
+
+		width=(bounds.width-10)-70;
+		
+		dict = currentFrame.getVarsArgsDict();
+		dict.keysValuesDo({
+			| key, val |
+			str = SCStaticText( container, Rect( x, y, 70, height ) )
+				.string_( key ).align_(\right);
+			button = RoundButton( container, Rect( x+70+6, y, width, height ))
+				.extrude_(false).radius_(2).resize_(2)
+				.states_([[ val.asString ]])
+				.action_({
+					val.inspect();
+				});
+			items.add( button );
+			items.add( str );
+			y = y + height + 3;
+		});
+		container.refresh();
+	}
+}
+
++Function {
+	debug {
+		Debugger.debug(this);
+	}
+}
+
++FunctionDef {
+	charPos {
+		if( context.notNil, 
+			{ ^context.charPos },
+			{ 0 }
+		)
+	}
+
+	openCodeFile {
+		if( context.notNil, { context.openCodeFile });
+	}
+	
+	filenameSymbol {
+		if( context.notNil, { ^context.filenameSymbol });
+	}
+	
+	ownerClass {
+		if( context.notNil, 
+			{ ^context.ownerClass }, 
+			{ ^nil })
+	}
+
+	openCodeFileAndSelect {
+		| charPos=0 |
+		var path, doc, lineStart, char;
+		path = this.filenameSymbol;
+		doc = Document.open(PathName(path.asString).asAbsolutePath);
+
+		lineStart = charPos-1;
+		char = doc.string[lineStart];
+		
+		while({ (char != $\n) }, {
+			lineStart = lineStart - 1;
+			char = doc.string[lineStart];
+		});
+		doc.selectRange( lineStart+1, charPos-lineStart );
+	}
+}
+
++DebugFrame {
+	getFriendlyString {
+		var str = "";
+		if( functionDef.isKindOf( Method ), {
+			str = "%.% : %.%".format(
+				functionDef.ownerClass.name,
+				functionDef.name,
+				line,
+				character
+			);
+			^str	
+		},{
+			^this.asString
+		})
+	}
+
+	getVarsArgsDict {
+		| dict |
+		dict = dict ? IdentityDictionary.new;
+
+		// args
+		args.do({
+			| val, i |
+			dict.put( functionDef.argNames[i].asSymbol, val );
+		});
+		vars.do({
+			| val, i |
+			dict.put( functionDef.varNames[i].asSymbol, val );
+		});
+		if( context != this, {
+			context.getVarsArgsDict( dict );
+		});
+		^dict
+	}
+}

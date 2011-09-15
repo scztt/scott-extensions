@@ -1,0 +1,22 @@
+{\rtf1\mac\ansicpg10000\cocoartf824\cocoasubrtf100
+{\fonttbl\f0\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue191;\red0\green0\blue0;}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+
+\f0\fs18 \cf2 HeadphoneStereo\cf3  \{\
+	*ar \{\
+		\cf2 arg\cf3  in, headX, headY, headT, x, y;\
+		\cf2 var\cf3  distR, distL, leftSig, rightSig, leftX, leftY, rightX, rightY;\
+		rightX = headX + (headT.cos * 0.05);\
+		leftX = headY - (headT.cos * 0.05);\
+\cf0 		rightY = headX + (headT.sin * 0.05);\
+		leftY = headY - (headT.sin * 0.05);\
+\cf3 \
+\
+		distR = ( ((rightX-x)**2) + ((rightY-y)**2) )**0.5;\
+		\cf0 distL = ( ((leftX-x)**2) + ((leftY-y)**2) )**0.5;\cf3 \
+		rightSig = \cf2 Distance\cf3 .ar( in, distR );\
+		leftSig = Distance.ar( in, distL );\
+		^[rightSig, leftSig];\
+	\}\
+\}}
