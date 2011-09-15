@@ -8,7 +8,7 @@ SelectionManager {
 	}
 	
 	init {
-		selection = List.new;
+		selection = IdentitySet.new;
 	}
 	
 	setSelection {

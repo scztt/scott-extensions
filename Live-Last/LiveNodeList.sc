@@ -1,24 +1,29 @@
-LiveNodeListView : SCCompositeView {
+LiveNodeListView : View {
 	var topMargin = 3, leftMargin = 3, verticalSpacing = 1;
 	var <data, <nodes, dragLayer, decoratorLayer, contentLayer, dragHighlight, dragHighlightPosition,  
 		<dragHandler, dragEvent, draggedItems,
 		<blockUpdates=false, needsUpdate=false,
-		<>selectionManager,
-		backgroundColor, lineColor, highlightColor;
+		<>selectionManager, <>topLevel = true, <>drawBorders=true,
+		backgroundColor, lineColor, highlightColor, <>depth=0;
 	
-	*viewClass { ^SCCompositeView }
+//	*viewClass { ^CompositeView }
 	
 	*new {
-		|...args|
-		^super.new(*args).initLiveNodeList();
+		| parent, bounds, topLevel=true |
+		^super.new(parent, bounds).topLevel_(topLevel).initLiveNodeList();
 	}
 	
 	initLiveNodeList {
 		nodes = IdentityDictionary.new;
-		decoratorLayer = SCUserView( this, this.bounds.moveTo(0,0))
+		decoratorLayer = UserView( this, this.bounds.moveTo(0,0))
 			.drawFunc_({ this.decoratorDraw() });
-		contentLayer = SCCompositeView( this, this.bounds.moveTo(0,0));
-		dragLayer = SCCompositeView( this, this.bounds.moveTo(0,0));
+		contentLayer = CompositeView( this, this.bounds.moveTo(0,0));
+		dragLayer = CompositeView( this, this.bounds.moveTo(0,0));
+		
+		dragHandler = TopLevelDragHandler.get(this.findWindow);
+		if( topLevel, {
+			dragHandler.addTarget( this );
+		});
 		
 		backgroundColor = Color.grey(0.7);
 		lineColor = Color.grey(0.3);
@@ -28,10 +33,12 @@ LiveNodeListView : SCCompositeView {
 		
 		this.onClose = {
 			nodes.do({
-				| nodes |
-				nodes.data = nil;
+				| node |
+				node.data = nil;
+				//node.removeView();
 			});
-			data.removeDependant();
+			dragHandler.removeTarget( this );
+			data.removeDependant(this);
 			nodes = dragHandler = dragEvent = draggedItems = selectionManager = nil;
 			this.releaseDependants();
 		}
@@ -74,6 +81,7 @@ LiveNodeListView : SCCompositeView {
 				newNodes[item] = node;
 			},{
 				newNodes[item] = this.createNode(item);
+				this.addNode( item, newNodes[item] )
 			});
 		});
 		differenceSet = nodes.values.difference( newNodes.values );
@@ -86,21 +94,63 @@ LiveNodeListView : SCCompositeView {
 	}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//	Dragging
+	// Dragging
+	
+	nodeMouseDownAction {
+		| node, x, y, modifiers |
+		if( node.drawSelected.not && (modifiers & KeyCodeResponder.shiftModifier != KeyCodeResponder.shiftModifier), {
+			selectionManager.setSelection(node);
+		},{
+			selectionManager.addSelection(node);		
+		});
+	}
+
+	nodeMouseMoveAction {
+		| node, x, y, modifiers |
+		var absBounds;
+		if( node.dragging, {
+			absBounds = node.absoluteBounds;
+			dragHandler.dragToChanged( x+absBounds.left,y+absBounds.top );
+		},{
+			node.dragging = true;
+			dragHandler.startDrag();		
+		})
+	}
+
+	nodeMouseUpAction {
+		| node, x, y, modifiers |
+		var absBounds;
+		if( node.dragging, {
+			absBounds = node.absoluteBounds;
+			node.dragging = false;
+			dragHandler.endDrag( x+absBounds.left, y+absBounds.top);
+		})
+	}
 	
 	containsNode {
 		| node |
-		^nodes.includesKey(node)
+		^nodes[node].notNil
 	}
 	
 	dragToChanged {
 		| items, x, y |
-		var nearestY, nearestYDelta, dropPosition, dropY;
-		
+		var nearestY, nearestYDelta, dropPosition, dropY, nodeUnder;
+				
 		if( items.notNil, {
 			dropY = y - this.absoluteBounds.top;
+			nodes.do({
+				| node |
+				if( node.absoluteBounds.contains( x@y ), {
+					if( node.acceptsDrag, {
+						if( node.dragToChanged( items, x, y ), {
+							^true
+						});
+					})
+				})
+			});
 			#nearestY, dropPosition = this.findDragInsertPoint(dropY);
-			this.putDragHighlight( nearestY )
+			this.putDragHighlight( nearestY );
+			^true;
 		},{
 			this.removeDragHighlight();
 		})
@@ -109,7 +159,7 @@ LiveNodeListView : SCCompositeView {
 	findDragInsertPoint {
 		| y |
 		var nearestY, dropPosition, nearestYDelta;
-		var node;
+		var node, nodeUnder;
 		if (data.seq.size>0, {
 			node = nodes[data.seq[0]];
 			nearestY = node.bounds.top-2;
@@ -130,7 +180,7 @@ LiveNodeListView : SCCompositeView {
 		},{
 			^[topMargin, 0];
 		});
-		^[nil,nil];
+		^[nil, nil, nodeUnder];
 	}
 	
 	putDragHighlight {
@@ -138,12 +188,13 @@ LiveNodeListView : SCCompositeView {
 		if( y.notNil, {
 			dragHighlightPosition = y+1;
 			dragHighlight = dragHighlight ?? { 
-				SCUserView( dragLayer, this.bounds.moveTo(0,0)) 
+				UserView( dragLayer, this.bounds.moveTo(0,0)) 
 					.drawFunc_({ 
 						| view |
 						var bounds = view.bounds.moveTo(0,0).insetBy(3,3);
 						Pen.strokeColor = highlightColor;
 						Pen.width = 3;
+						//Pen.strokeRect( bounds );
 						Pen.line( 3@dragHighlightPosition, bounds.right@dragHighlightPosition );
 						Pen.stroke;
 					})
@@ -157,15 +208,19 @@ LiveNodeListView : SCCompositeView {
 	removeDragHighlight {
 		dragHighlight.notNil.if({ dragHighlight.remove() });
 		dragHighlight = nil;
-		this.refresh();
+		nil.notNil.if({
+			this.refresh();
+		});
 	}
 	
 	decoratorDraw {
-		Pen.width = 4;
-		Pen.color = backgroundColor;
-		Pen.fillRect( decoratorLayer.bounds );
-		Pen.color = lineColor;
-		Pen.strokeRect( decoratorLayer.bounds );
+		if( drawBorders, {
+			Pen.width = 4;
+			Pen.color = backgroundColor;
+			Pen.fillRect( decoratorLayer.bounds.insetBy(3) );
+			Pen.color = lineColor;
+			Pen.strokeRect( decoratorLayer.bounds );
+		})
 	}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -175,23 +230,24 @@ LiveNodeListView : SCCompositeView {
 		| data, update=true |
 		var newNode = LiveNode( selectionManager );
 		newNode.data = data;
-		this.initNode( newNode );
+		//this.initNode( newNode );
 		^newNode;
 	}
 	
 	initNode {
 		| newNode |
 		newNode.dragLayer = dragLayer;
-		newNode.dragHandler = dragHandler;
+		//newNode.dragHandler = dragHandler;
 		newNode.createView( contentLayer, Rect(0,0,this.bounds.width-leftMargin-leftMargin,24));
-//		newNode.startDragAction = dragHander.startDragAction ;
-//		newNode.finishDragAction = this.nodeMouseMoveAction(_);
-//		newNode.dragAction = this.nodeMouseUpAction(_);
+		
+		newNode.mouseDownAction = { |...args| this.nodeMouseDownAction(*args) };
+		newNode.mouseMoveAction = { |...args| this.nodeMouseMoveAction(*args) };
+		newNode.mouseUpAction = { |...args| this.nodeMouseUpAction(*args) };
+		
 		newNode.addDependant( this );
 	}
 	
 	postNodelist {
-		"Nodelist:".postln;
 		nodes.do({
 			|node|
 			"\t% ".postf(node);
@@ -205,6 +261,7 @@ LiveNodeListView : SCCompositeView {
 	
 	addNode {
 		| item, node |
+		node.depth = depth+1;
 		if(nodes[item].notNil, {
 			"Already a node for this item!".warn;
 			^false;
@@ -226,17 +283,17 @@ LiveNodeListView : SCCompositeView {
 	
 	update {
 		| who, what ...args |
+		var node, nodes, items;
 		
 		switch (what)
 		{ \itemsAdded }
 			{
-				var node, nodes, items;
 				items = args[0];
 				nodes = args[1];
 				if(nodes.isNil, {
 					items.do({
 						| item |
-						node = this.createNode(who);
+						node = this.createNode(item);
 						this.addNode( item, node )
 					})
 				},{
@@ -289,12 +346,13 @@ LiveNodeListView : SCCompositeView {
 		if(blockUpdates, {
 			needsUpdate = true;
 		},{
+			"updating arrangement".postln;
 			data.seq.do({
 				| item, i |
 				node = nodes[item];
 				if( node.notNil, {
 					node.moveTo(leftMargin@y);
-					y = y + node.height + verticalSpacing;
+					y = y + node.height.postln + verticalSpacing;
 				},{
 					"Nil node encountered....".warn;
 				})
@@ -303,18 +361,25 @@ LiveNodeListView : SCCompositeView {
 			y = y + verticalSpacing + 1;
 			this.bounds = this.bounds.height_(y);
 			this.refresh();
-			this.changed(this, \bounds);
+			this.changed(\boundsChanged);
 		})
 	}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//	Etc.
-		
+	
 	bounds_{
 		| rect |
 		this.setProperty(\bounds, rect);
 		dragLayer.bounds = rect.moveTo(0,0);
 		contentLayer.bounds = rect.moveTo(0,0);
 		decoratorLayer.bounds = rect.moveTo(0,0);
-	}	
+	}
+	
+	checkNodes {
+		nodes.do({
+			| node, i |
+			"%: %\n".postf(i, node.view.slotAt(0));
+		})
+	}
 }

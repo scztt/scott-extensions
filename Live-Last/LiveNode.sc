@@ -1,10 +1,10 @@
 LiveNode {
-	var <data, <view, <detailView, <>dragLayer, parent, <>selectionManager;
+	var <data, <view, <detailView, <detailViewContents, <>dragLayer, parent, <>selectionManager, originalBounds;
 	var <>mouseDownAction, <>mouseUpAction, <>mouseMoveAction;
-	var dragging=false, dragPoint,
-		expanded=false;
-	var color, drawSelected=false, headerSize=25, removeInFuture;
-	var uninitializedColor, initializedColor, preparedColor, playingColor;
+	var <>dragging=false, <>dragPoint,
+		expanded=false, <acceptsDrag=false;
+	var color, <>drawSelected=false, headerSize=25, removeInFuture;
+	var uninitializedColor, initializedColor, preparedColor, playingColor, <>depth=0;
 	
 	*new{
 		| selectionManager |
@@ -14,7 +14,6 @@ LiveNode {
 	initLiveNode {
 		| inSelectionManager |
 		selectionManager = inSelectionManager;
-		color = Color.hsv(0.6,0.3,0.7);
 		
 		initializedColor = Color.grey();
 		uninitializedColor = Color.hsv( Color.red.asHSV[0], 0.7, 0.9 );
@@ -24,11 +23,21 @@ LiveNode {
 	
 	data_{
 		| inData |
+		var inColor;
 		if( data.notNil, {
 			data.removeDependant(this);
 		});
 		if( inData.notNil, {
-			color = inData.color ? Color.hsv(0.6,0.3,0.7);
+			inColor = inData.color;
+			color = if( inColor.isNil, {
+				Color.hsv(0.7, 0.4, 0.8)
+			},{
+				if( inColor.isNumber, {
+					Color.hsv(inColor, 0.4, 0.8);
+				},{
+					inColor.value;
+				})
+			})
 		});
 		data = inData;
 		data.addDependant(this);
@@ -37,13 +46,18 @@ LiveNode {
 	createView {
 		| inParent, inRect |
 		parent = inParent;
-		view = SCUserView( inParent, inRect );
+		originalBounds = inRect;
+		view = UserView( inParent, inRect );
 		
 		view.drawFunc = this.draw(_);
 		view.mouseDownAction = { |view,x,y,mod| this.mouseDown(view,x,y, mod) };
 		view.mouseMoveAction = { |view,x,y,mod| this.mouseMove(view,x,y,mod) };
 		view.mouseUpAction = { |view,x,y,mod| this.mouseUp(view,x,y,mod) };
 		view.canFocus_(false);		
+		view.onClose_({ 
+			| inView |
+			//view = nil 
+		});
 	}
 	
 	draw {
@@ -84,14 +98,24 @@ LiveNode {
 				}
 			{ \donePlaying }
 				{
-					Pen.color = playingColor.alpha_(0.5);
+					Pen.color = playingColor.alpha_(0.75);
 					Pen.fillRect( Rect(0,0,25,25).insetBy(6) );
 				}
 		;
-		icon = expanded.if( {\down}, {\play} );
-		Pen.fillColor = initializedColor;
 		
-		DrawIcon( icon, Rect(this.bounds.right-25, 2, 20, 20) );
+		if(data.hasDetailView, {
+			icon = expanded.if( {\down}, {\play} );
+			Pen.fillColor = initializedColor;
+			
+			DrawIcon( icon, Rect(this.bounds.right-25, 2, 20, 20) );
+		});
+		
+		if( data.name.notNil, {
+			Pen.strokeColor = Color.black;
+			Pen.fillColor = Color.black;
+			Pen.font = Font( "Helvetica", 10);
+			Pen.stringCenteredIn( data.name, originalBounds.moveTo(0,0).insetBy(3.5)  )
+		})
 	}
 	
 	select {
@@ -101,12 +125,12 @@ LiveNode {
 	
 	deselect {
 		drawSelected = false;
-		view.refresh();
+		if( view.notNil, { view.refresh() })
 	}
 	
 	mouseDown {
 		| inView, x, y, modifiers |
-		if( x > (this.bounds.right-30), {
+		if( (x > (this.bounds.right-30)) && data.hasDetailView, {
 			this.expandAction();
 //			if( (data.state!=\playing), {
 //				if( drawSelected.not && (modifiers & KeyCodeResponder.shiftModifier != KeyCodeResponder.shiftModifier), {
@@ -116,7 +140,7 @@ LiveNode {
 //				});
 //			});
 		},{
-			mouseDownAction.(inView, x, y, modifiers);
+			mouseDownAction.(this, x, y, modifiers);
 		});
 			
 		dragPoint = x@y;
@@ -125,7 +149,7 @@ LiveNode {
 	mouseMove {
 		| inView, x, y |
 		var absBounds = inView.absoluteBounds;
-//		mouseMoveAction.(this, );
+		mouseMoveAction.(this, x, y);
 //		if( (data.state!=\playing), {
 //			if( dragging, {
 //				absBounds = inView.absoluteBounds;
@@ -141,7 +165,7 @@ LiveNode {
 	
 	mouseUp {
 		| inView, x,y |
-		mouseUpAction.(inView, x, y);
+		mouseUpAction.(this, x, y);
 //		var absBounds;
 //		if( dragging, {
 //			absBounds = inView.absoluteBounds;
@@ -157,41 +181,87 @@ LiveNode {
 		if( view.notNil, {
 			viewBounds = this.view.bounds;
 			if( expanded, {
-				if( data.hasGui,{
-					detailView = SCCompositeView( parent, viewBounds.insetBy(1, 0).moveBy(0, headerSize) );
-					data.makeDetailView( detailView, detailView.bounds.moveTo(0,0), selectionManager );
+				if( data.hasDetailView,{
+					detailView = CompositeView( parent, viewBounds.moveBy(0, headerSize) );
+					// detailView.background_(Color.red.alpha_(0.3));
+					detailViewContents = data.makeDetailView( detailView, detailView.bounds.moveTo(0,0).insetBy(2,0), selectionManager );
+					detailViewContents.addDependant(this);
+					detailViewContents.respondsTo(\depth_).if({
+						detailViewContents.depth = this.depth;
+					},{
+						"cannot set depth".postln;
+					});
 					detailView.children.do({
 						| child |
-						child.bounds.postln;
 						viewBounds.height_(max(viewBounds.height, child.bounds.bottom));
 					});
 					detailView.bounds = detailView.bounds.height_(viewBounds.height);
+					detailView.onClose = { 
+						detailViewContents.releaseDependants();
+						detailView = nil;
+					};
+					this.updateBounds();
 					detailView.refresh();
+					acceptsDrag = data.detailAcceptsDrag;
 				})
 			},{
 				detailView.notNil.if({
+					detailViewContents.releaseDependants();
 					detailView.remove();
-					detailView = nil;
+					detailView = detailViewContents = nil;
+					acceptsDrag = false;
+					this.updateBounds();
 				})
 			});
 		});
-		this.changed(\boundsChanged);
+	}
+	
+	updateBounds {
+		if( detailView.notNil, {
+			this.detailView.bounds = this.detailView.bounds.height_(detailViewContents.bounds.height+2);
+			this.bounds = originalBounds.copy.height_(headerSize+detailViewContents.bounds.height+2);
+			this.changed(\boundsChanged);
+		},{
+			this.bounds = originalBounds;
+			this.changed(\boundsChanged);
+		})
 	}
 	
 	moveTo {
 		| inPoint |
-		this.bounds = view.bounds.moveTo( *(inPoint.asArray) )
+		this.bounds = view.bounds.moveTo( *(inPoint.asArray) );
+		if( detailView.notNil, {
+			detailView.bounds_( detailView.bounds.moveTo( inPoint.x, headerSize+inPoint.y ) );
+		})
 	}
 	
 	height {
-		^this.bounds.height;
+		^this.absoluteBounds.height;
 	}
 	
 	bounds {
+		if( view.isNil, {
+			"view is nil.... oops".postln;
+			^Rect(0,0,0,0);
+		});
 		if( expanded, {
-			^view.bounds.union( detailView.bounds );
+			^view.bounds;
 		}, {
 			^view.bounds;
+		})
+	}
+	
+	absoluteBounds {
+		if( view.isNil, {
+			"view is nil.... oops".postln;
+			^Rect(0,0,0,0);
+		});
+		if( expanded, {
+			"view: %\n".postf(view.absoluteBounds);
+			"detailViewContents: %\n".postf(detailViewContents.absoluteBounds);
+			^view.absoluteBounds.union( detailViewContents.absoluteBounds );
+		}, {
+			^view.absoluteBounds;
 		})
 	}
 	
@@ -203,10 +273,25 @@ LiveNode {
 		view.bounds = inBounds;
 	}
 	
+	dragToChanged {
+		| ...args |
+		if( detailView.notNil && acceptsDrag, {
+			^detailViewContents.dragToChanged(*args);
+		},{
+			^false
+		})
+	}
+	
 	update {
 		| who, what, args |
 		
 		switch (what)
+			// Child item bounds changed - pass it along
+			{ \boundsChanged }
+				{
+					"child bounds changed".postln;
+					this.updateBounds();
+				}
 			{ \stateChanged }
 				{
 					{ 
@@ -223,7 +308,6 @@ LiveNode {
 	
 	removeView {
 		var forRemoval = List.new;
-		
 		if( dragging.not, {
 			if( view.notNil, {
 				forRemoval.add(view);
@@ -234,12 +318,15 @@ LiveNode {
 				detailView.visible = false;
 			});		
 			{ 
-				forRemoval.do(_.remove());
+				forRemoval.do({ |item| item.remove() });
 				forRemoval.clear;
 			}.defer(0.1);
+			forRemoval.do({ |i| i.identityHash.postln });
 			view = detailView = nil;
+			selectionManager.removeSelection(this);
 			removeInFuture = false;
 		},{
+			"deferring removal for a later date.".postln;
 			removeInFuture = true;
 		});
 	}

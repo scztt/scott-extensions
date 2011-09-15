@@ -19,6 +19,10 @@ LiveEvent : LinkedObjectListNode {
 		^super.new.init( *args )
 	}
 	
+	name {
+		^nil
+	}
+	
 	state_{
 		| inState |
 		state = inState;
@@ -58,7 +62,8 @@ LiveEvent : LinkedObjectListNode {
 		});
 		
 		playRoutine = Routine({
-			prepHasFinished.wait;			
+			"playroutine entered".postln;
+			prepHasFinished.wait;		
 			this.state = \playing;
 			
 			startTimeHint = startTimeHint ? thisThread.clock.seconds;
@@ -67,7 +72,7 @@ LiveEvent : LinkedObjectListNode {
 				thisThread.clock.schedAbs( startTimeHint + duration, 
 					{ playHasFinished.test_(true).signal });
 			});
-			
+			"about to play".postln;
 			playAction.value();
 			
 			 duration.isNil.if({ 
@@ -96,10 +101,12 @@ LiveEvent : LinkedObjectListNode {
 	}
 	
 	doPlay {
+		"entered doplay".postln;
 		if( (state==\initialized) && prepareAction.notNil, {
-			prepareRoutine.play(SystemClock)
+			prepareRoutine.play(clock)
 		});
 		
+		"about to playroutine".postln;
 		playRoutine.play(clock);
 		playHasFinished.wait();
 		
@@ -117,9 +124,10 @@ LiveEvent : LinkedObjectListNode {
 	}
 	
 	prReset {
-		prepareRoutine.stop.reset;
-		playRoutine.stop.reset;
-		freeRoutine.stop.reset;
+		"resetting".postln;
+		prepareRoutine.reset;
+		playRoutine.reset;
+		freeRoutine.reset;
 		
 		startTimeHint = duration = nil;
 		wasReleased = false;
@@ -148,6 +156,14 @@ LiveEvent : LinkedObjectListNode {
 	
 	cmdPeriod {
 		this.prReset();
+	}
+	
+	printOn {
+		| stream |
+		stream << "LiveEvent(" << "state:" << this.state << 
+			" prev" << prev.notNil.if({"*"},{"nil"}) <<
+			" next:" << next.notNil.if({"*"},{"nil"}) <<
+			")"; 
 	}
 }
 

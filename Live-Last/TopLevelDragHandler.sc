@@ -1,16 +1,25 @@
 TopLevelDragHandler {
-	var view, <dragLayer, selectionManager, dragTargets, dragging, draggingOver;
+	classvar <handlers;
+	var window, selectionManager, dragTargets, dragging, draggingOver;
+	
+	*initClass {
+		handlers = IdentityDictionary.new;
+	}
+	
+	*get {
+		| window |
+		^handlers[window.identityHash]
+	}
 	
 	*new {
-		| view, selectionManager |
-		^super.new.init(view, selectionManager)
+		| window, selectionManager |
+		^super.new.init(window, selectionManager)
 	}	
 	
 	init {
-		| inView, inSelectionManager |
-		dragLayer = SCCompositeView( inView, inView.bounds.moveTo(0,0))
-			.resize_(5);
-		view = inView;
+		| inWindow, inSelectionManager |
+		this.class.handlers[inWindow.identityHash] = this;
+		window = inWindow;
 		selectionManager = inSelectionManager;
 		dragTargets = LinkedList.new;
 	}
@@ -25,7 +34,7 @@ TopLevelDragHandler {
 			if( draggingCopy.isEmpty.not, {
 				contained = draggingCopy.removeAllSuchThat({
 					| node |
-					target.containsNode(node);
+					target.containsNode(node.data);
 				});
 				contained.do({
 					| node |
@@ -49,7 +58,6 @@ TopLevelDragHandler {
 	
 	 startDrag {
 		 if(selectionManager.selection.notEmpty, {
-			"start drag".postln;
 			
 			dragging = List.new(selectionManager.selection.size)
 				.addAll(selectionManager.selection);
@@ -58,27 +66,33 @@ TopLevelDragHandler {
 	
 	dragToChanged {
 		| x, y |
-		var dropPosition, nearestY;
+		var dropPosition, nearestY, depth=0, dropTarget;
 		dragTargets.do({
 			| target |
-			if (target.bounds.contains(x@y), {
-				if (draggingOver != target, {
-					draggingOver.notNil.if({ 
-						draggingOver.dragToChanged(nil,nil,nil);
-					});
-					draggingOver = target;
+			if (target.notNil and: { target.absoluteBounds.contains(x@y) }, {
+				if( target.depth >= depth, {
+					depth = target.depth;
+					dropTarget = target;
 				});
-				
-				target.dragToChanged( dragging, x, y );
-				#nearestY, dropPosition = draggingOver.findDragInsertPoint(y - draggingOver.absoluteBounds.top);
-				dropPosition.postln;
 			})			
+		});
+		
+		if (draggingOver != dropTarget, {
+			draggingOver.notNil.if({ 
+				draggingOver.dragToChanged(nil,nil,nil);
+			});
+			draggingOver = dropTarget;
+		});
+		
+		if( dropTarget.notNil, {
+			dropTarget.dragToChanged( dragging, x, y );
+			#nearestY, dropPosition = dropTarget.findDragInsertPoint(y - dropTarget.absoluteBounds.top);
 		})
 	}
 	
 	endDrag {
 		| x, y |
-		var nearestY, dropPosition, draggedItems;
+		var nearestY, dropPosition, draggedItems, draggingParents, parent;
 			
 		draggingOver.notNil.if({
 			#nearestY, dropPosition = draggingOver.findDragInsertPoint(y - draggingOver.absoluteBounds.top);
@@ -89,20 +103,26 @@ TopLevelDragHandler {
 			if( dropPosition.notNil, {
 				draggingOver.updateAfter({
 					draggedItems = dragging.collect( _.data );
+					draggingParents  = this.getDragParentsMap();
 					dragging.reverse.do({
 						| node |
 						if( node.data.state != \playing, {
 							draggingOver.nodes[node.data].isNil.if({
-								node.data.changed(\childRemoved);
-								draggingOver.data.insert( dropPosition, node.data );
-								draggingOver.data.validate;
+								parent = draggingParents[node];
+								parent.data.seq.remove(node.data).isNil.if({ "nothing removed".warn });
+								
+								parent.data.changed( \itemsRemoved, [node.data]);
+								
+								draggingOver.data.seq.insert( dropPosition, node.data );
+								draggingOver.data.changed( \itemsAdded, [node.data], [node]);
+								draggingOver.data.seq.validate;
 							},{
-								draggingOver.data.moveTo( dropPosition, node.data );
-								draggingOver.data.validate;
+								draggingOver.data.seq.moveTo( dropPosition, node.data );
+								draggingOver.data.seq.validate;
 							})		
 						},{
-							dragging.remove(node);
-							draggedItems.remove(node.data);
+							// dragging.remove(node);
+							// draggedItems.remove(node.data);
 						})
 					});
 					draggingOver.data.changed(\itemsAdded, draggedItems, dragging )

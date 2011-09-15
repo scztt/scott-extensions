@@ -22,9 +22,12 @@ LiveEventPlayHead {
 			playing = true;
 			playFinished = Condition(false);
 			playRoutine = Routine({
+				"starting playhead routine".postln;
 				currentEvent = startEvent;
+				currentEvent.postln;
 				while({currentEvent.notNil}, {
 					currentEvent.startTimeHint = startTimeHint;
+					startTimeHint.postln;
 					
 					currentEvent.doPlay(this);
 					startTimeHint = currentEvent.endTimeHint;

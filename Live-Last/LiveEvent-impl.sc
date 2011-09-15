@@ -1,5 +1,6 @@
 LiveEventSequence : LiveEvent {
-	var playhead, <>parentPlayhead, <seq, prepareAll=false, <>repeats=1;
+	var playhead, <>parentPlayhead, <seq, prepareAll=false, <>repeats=1, 
+		<>name;
 	
 	init {
 		| inPlayhead |
@@ -66,26 +67,35 @@ LiveEventSequence : LiveEvent {
 	doPlay {
 		| inPlayhead, count=1 |
 		var iter=0;
-		playhead = LiveEventPlayHead();
+		"%.doPlay\n".postf(this);
+		playhead = LiveEventPlayHead(seq.head);
 		playhead.startTimeHint = startTimeHint;
 		inPlayhead.addDependant(playhead);
 		
 		this.state = \playing;
-		while( iter<count, {
+		while({ (iter.postln < count.postln).postln }, {
+			"starting loop".postln;
 			protect {	
+				"in protect loop".postln;
 				playhead.play();
+				"after play".postln;
 				playhead.playFinished.wait;
+				"after playfinished".postln;
 				endTimeHint = playhead.endTimeHint ? clock.seconds;
+				"after hint".postln;
+				playhead.reset();
+				"after reset".postln;
 			} {
-				playHasFinished.test_(true).signal;
-				inPlayhead.removeDependant( playhead );
-				this.state = \initialized;
+				iter = iter+1;
 			};
 		});
+		playHasFinished.test_(true).signal;
+		this.state = \initialized;
+		inPlayhead.removeDependant( playhead );
 	}
 	
 	color {
-		^Color.blue(0.7);
+		^Color.grey(0.8);
 	}
 	
 	hasDetailView {
@@ -95,8 +105,9 @@ LiveEventSequence : LiveEvent {
 	makeDetailView {
 		| parent, bounds, selectionManager, dragHandler |
 		var view = LiveNodeListView( parent, bounds );
+		view.drawBorders = false;
 		view.selectionManager = selectionManager;
-		view.dragHandler = dragHandler;
+//		view.dragHandler = dragHandler;
 		view.data = this;
 		view.updateArrangement();
 		^view;
@@ -104,6 +115,26 @@ LiveEventSequence : LiveEvent {
 	
 	destroyDetailView {
 	}
+	
+	detailAcceptsDrag {
+		^true
+	}
+	
+	printOn {
+		| stream |
+		stream << "LiveEventSequence([\n";
+		seq.do({
+			| item, i |
+			stream << "\t";
+			item.printOn(stream);
+			stream << "\n";
+			if( i>500, {
+				"Woa! Too large!".warn;
+				^nil;
+			})
+		});
+		stream << "])";
+	}	
 }
 
 
@@ -112,8 +143,9 @@ EnvirLiveEvent : LiveEvent {
 	
 	init {		
 		| inEnvir |
+		super.init();
 		this.initEnvir( inEnvir );
-		^super.init();
+		^this;
 	}
 	
 	initRoutines {
@@ -128,7 +160,11 @@ EnvirLiveEvent : LiveEvent {
 		});
 		
 		playRoutine = Routine({
+			"entered playroutine".postln;
+			this.identityHash.postln;
+			prepHasFinished.postln; prepHasFinished.test.postln;
 			prepHasFinished.wait;			
+			"done waiting for prep".postln;
 			this.state = \playing;
 			
 			startTimeHint = startTimeHint ? thisThread.clock.seconds;
@@ -138,6 +174,7 @@ EnvirLiveEvent : LiveEvent {
 					{ playHasFinished.test_(true).signal });
 			});
 			
+			"playing".postln;
 			envir.use( playAction );
 			
 			duration.isNil.if({ 
@@ -157,6 +194,7 @@ EnvirLiveEvent : LiveEvent {
 	
 	initEnvir {
 		| e |
+		"% - initEnvir\n".postf( this.identityHash.postln );
 		envir = e ? envir;
 		if( envir.notNil, {
 			if( envir.includesKey(\duration),	{ duration = envir[\duration].value });
@@ -175,7 +213,8 @@ EnvirLiveEvent : LiveEvent {
 			envir[\release] = { 
 				playHasFinished.test_(true).signal;
 			};
-		})
+		});
+		prepHasFinished.test.postln;
 	}
 	
 	envir_{
@@ -183,6 +222,11 @@ EnvirLiveEvent : LiveEvent {
 		if( e != envir, {
 			this.initEnvir( e );
 		})
+	}
+	
+	prReset {
+		super.prReset();
+		this.initEnvir();
 	}
 	
 	doInitialize {
@@ -205,7 +249,13 @@ EnvirLiveEvent : LiveEvent {
 	
 	color {
 		envir.notNil.if({ 
-			^envir[\color] ?? { ^super.color }
+			^envir[\color].value ?? { ^super.color }
+		})
+	}
+	
+	name {
+		envir.notNil.if({ 
+			^envir[\name].value ?? { ^nil }
 		})
 	}
 }

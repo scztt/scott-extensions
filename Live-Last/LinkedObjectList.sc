@@ -87,7 +87,7 @@ LinkedObjectList : LinkedList {
 	}
 	
 	insertAllAfter { arg index, list;
-		var node;
+		var node, newList;
 		if( list.isKindOf(LinkedObjectList), {
 			node = this.nodeAt(index);
 			if (node.notNil, {
@@ -103,7 +103,7 @@ LinkedObjectList : LinkedList {
 				});
 			})							
 		},{
-			var newList = LinkedObjectList();
+			newList = LinkedObjectList();
 			list.do({
 				| item |
 				newList.add(item);
@@ -136,7 +136,8 @@ LinkedObjectList : LinkedList {
 			if (node.prev.notNil, { node.prev.next_(node.next); });
 			if (node.next.notNil, { node.next.prev_(node.prev); });
 			
-			node.next = node.prev = nil;
+			node.next = nil;
+			node.prev = nil;
 			size = size - 1;
 			^node;
 		})
